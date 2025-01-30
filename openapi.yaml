@@ -1,0 +1,659 @@
+openapi: 3.0.3
+info:
+  title: Survey Service API
+  version: "1.0.0"
+  description: |
+    This API provides a back-end for a Survey Telegram Mini App.
+    Users can answer surveys and receive a promo-code as a reward,
+    which can then be activated for discounts.
+
+servers:
+  - url: https://api.example.com
+    description: Production server
+
+tags:
+  - name: User
+    description: Operations related to user management
+  - name: Survey
+    description: Operations related to surveys, questions, and answers
+  - name: Code
+    description: Operations related to promo-codes
+
+paths:
+  /user:
+    post:
+      tags:
+        - User
+      summary: Create a new user
+      requestBody:
+        description: Data required to create a new user
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserCreateRequest'
+            example:
+              firstName: John
+              lastName: Doe
+              languageCode: en-EN
+              profilePicture: "https://cdn.example.com/users/john_doe.png"
+              username: johndoe
+              allowsWriteToPM: true
+      responses:
+        '201':
+          description: User created
+          content:
+            application/json:
+              examples:
+                userCreated:
+                  summary: Example user creation response
+                  value:
+                    id: "12345"
+                    firstName: "John"
+                    lastName: "Doe"
+                    languageCode: "en-EN"
+                    profilePicture: "https://cdn.example.com/users/john_doe.png"
+                    username: "johndoe"
+                    allowsWriteToPM: true
+                    creationDate: "2025-01-01T10:00:00Z"
+              schema:
+                $ref: '#/components/schemas/User'
+        '400':
+          description: Invalid input
+          content:
+            application/json:
+              examples:
+                invalidInput:
+                  summary: Example error response for invalid user creation
+                  value:
+                    errorCode: "INVALID_INPUT"
+                    message: "Missing required fields: firstName"
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Conflict — user with this ID or other unique field already exists
+          content:
+            application/json:
+              examples:
+                userConflict:
+                  summary: Example conflict error
+                  value:
+                    errorCode: "USER_ALREADY_EXISTS"
+                    message: "A user with ID '12345' already exists."
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /survey:
+    get:
+      tags:
+        - Survey
+      summary: List Surveys available for the User
+      description: |
+        Returns a list of surveys that the user can see, according to the display logic:
+        - All **active** surveys (`isActive = true`).
+        - **Inactive** surveys only if:
+          1. The user has completed the survey (answered all questions), **and**
+          2. The user’s code for this survey is **not** used.
+
+        The `progress` field is the percentage of answered questions (0–100).
+      parameters:
+        - name: X-User-Id
+          in: header
+          description: The ID of the user requesting the surveys
+          required: true
+          schema:
+            type: string
+            example: "12345"
+      responses:
+        '200':
+          description: List of surveys with progress info for the user
+          content:
+            application/json:
+              examples:
+                multipleSurveys:
+                  summary: Example active/inactive survey list
+                  value:
+                    - id: "survey_001"
+                      title: "Weekly Feedback"
+                      description: "Share your experience"
+                      progress: 50
+                    - id: "survey_002"
+                      title: "Product Launch Survey"
+                      description: "Help us improve our products"
+                      progress: 100
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/SurveyListItem'
+        '400':
+          description: Invalid user ID
+          content:
+            application/json:
+              examples:
+                invalidUserId:
+                  summary: Example error response
+                  value:
+                    errorCode: "INVALID_USER_ID"
+                    message: "User ID is not valid or does not exist"
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /survey/{surveyId}:
+    get:
+      tags:
+        - Survey
+      summary: View details of a specific survey, including questions and answers
+      description: |
+        Retrieves the full information of a survey, including questions, answer variants,
+        and any answers the user has already provided.
+      parameters:
+        - name: surveyId
+          in: path
+          required: true
+          schema:
+            type: string
+            example: "survey_001"
+        - name: X-User-Id
+          in: header
+          description: The ID of the user requesting the survey details
+          required: true
+          schema:
+            type: string
+            example: "12345"
+      responses:
+        '200':
+          description: Survey details
+          content:
+            application/json:
+              examples:
+                surveyDetail:
+                  summary: Example survey details with questions
+                  value:
+                    id: "survey_001"
+                    title: "Weekly Feedback"
+                    description: "Share your experience"
+                    creationDate: "2025-01-25T10:00:00Z"
+                    isActive: true
+                    codeValidEndDate: "2025-02-25T10:00:00Z"
+                    questions:
+                      - id: "q_101"
+                        surveyId: "survey_001"
+                        title: "How was your experience?"
+                        description: "Overall satisfaction with our service."
+                        index: 1
+                        answerVariants:
+                          - id: "av_101a"
+                            questionId: "q_101"
+                            label: "Excellent"
+                            value: "5"
+                          - id: "av_101b"
+                            questionId: "q_101"
+                            label: "Good"
+                            value: "4"
+                          - id: "av_101c"
+                            questionId: "q_101"
+                            label: "Average"
+                            value: "3"
+                          - id: "av_101d"
+                            questionId: "q_101"
+                            label: "Poor"
+                            value: "2"
+                        userAnswerVariantId: "av_101b"
+                      - id: "q_102"
+                        surveyId: "survey_001"
+                        title: "Would you recommend us?"
+                        description: "Recommendation possibility."
+                        index: 2
+                        answerVariants:
+                          - id: "av_102a"
+                            questionId: "q_102"
+                            label: "Yes"
+                            value: "1"
+                          - id: "av_102b"
+                            questionId: "q_102"
+                            label: "No"
+                            value: "0"
+                        userAnswerVariantId: null
+              schema:
+                $ref: '#/components/schemas/SurveyDetail'
+        '404':
+          description: Survey not found or user not allowed to access it
+          content:
+            application/json:
+              examples:
+                surveyNotFound:
+                  summary: Example error for missing/inactive survey
+                  value:
+                    errorCode: "SURVEY_NOT_FOUND"
+                    message: "The requested survey does not exist or is not accessible."
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /survey/{surveyId}/answer:
+    post:
+      tags:
+        - Survey
+      summary: Accept a user’s answer for a question
+      description: |
+        Endpoint to submit a single answer for a specific survey’s question.
+      parameters:
+        - name: surveyId
+          in: path
+          required: true
+          schema:
+            type: string
+            example: "survey_001"
+        - name: X-User-Id
+          in: header
+          description: The ID of the user submitting the answer
+          required: true
+          schema:
+            type: string
+            example: "12345"
+      requestBody:
+        description: Answer data
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AnswerRequest'
+            example:
+              questionId: "q_102"
+              answerVariantId: "av_102a"
+      responses:
+        '200':
+          description: Answer accepted
+          content:
+            application/json:
+              examples:
+                answerAccepted:
+                  summary: Example successful answer submission
+                  value:
+                    id: "answer_001"
+                    userId: "12345"
+                    questionId: "q_102"
+                    answerId: "av_102a"
+                    timestamp: "2025-01-26T12:15:30Z"
+              schema:
+                $ref: '#/components/schemas/Answer'
+        '400':
+          description: Invalid answer format
+          content:
+            application/json:
+              examples:
+                invalidAnswer:
+                  summary: Example error for invalid request data
+                  value:
+                    errorCode: "INVALID_ANSWER_DATA"
+                    message: "answerVariantId 'av_999' does not match any existing answer option."
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Survey or question not found
+          content:
+            application/json:
+              examples:
+                questionNotFound:
+                  summary: Example error for question not found
+                  value:
+                    errorCode: "QUESTION_NOT_FOUND"
+                    message: "The specified question ID does not exist in this survey."
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /code/{surveyId}:
+    get:
+      tags:
+        - Code
+      summary: View the promo-code rewarded to the user for completing a survey
+      description: |
+        Returns the promo-code if the user has fully completed the survey.
+        Otherwise, returns an error.
+      parameters:
+        - name: surveyId
+          in: path
+          required: true
+          schema:
+            type: string
+            example: "survey_001"
+        - name: X-User-Id
+          in: header
+          description: The ID of the user requesting the code
+          required: true
+          schema:
+            type: string
+            example: "12345"
+      responses:
+        '200':
+          description: Promo-code information
+          content:
+            application/json:
+              examples:
+                promoCodeView:
+                  summary: Example promo-code for a completed survey
+                  value:
+                    id: "code_001"
+                    userId: "12345"
+                    surveyId: "survey_001"
+                    promoCode: "DISCOUNT2025"
+                    isUsed: false
+              schema:
+                $ref: '#/components/schemas/Code'
+        '404':
+          description: No promo-code found for this user or survey not completed
+          content:
+            application/json:
+              examples:
+                codeNotFound:
+                  summary: Example error for missing code
+                  value:
+                    errorCode: "CODE_NOT_AVAILABLE"
+                    message: "No code found or survey not completed."
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /code/activate:
+    post:
+      tags:
+        - Code
+      summary: Activate (use) a promo-code
+      description: |
+        Method for an external service to check if the promo-code is valid and mark it as used.
+      requestBody:
+        description: Promo-code to be activated
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CodeActivateRequest'
+            example:
+              promoCode: "DISCOUNT2025"
+      responses:
+        '200':
+          description: Code activated successfully
+          content:
+            application/json:
+              examples:
+                activationSuccess:
+                  summary: Example successful code activation
+                  value:
+                    success: true
+                    message: "Promo code DISCOUNT2025 has been activated."
+              schema:
+                $ref: '#/components/schemas/CodeActivateResponse'
+        '400':
+          description: Invalid or already used code
+          content:
+            application/json:
+              examples:
+                codeInvalid:
+                  summary: Example error for invalid code
+                  value:
+                    success: false
+                    message: "Promo code is invalid or already used."
+              schema:
+                $ref: '#/components/schemas/CodeActivateResponse'
+
+components:
+  schemas:
+    # --------------------------
+    # User
+    # --------------------------
+    UserCreateRequest:
+      type: object
+      properties:
+        id:
+          type: number
+          description: User ID provided by Telegram
+        firstName:
+          type: string
+          description: First name of the user
+        lastName:
+          type: string
+          description: Last name of the user
+        languageCode:
+          type: string
+          description: Language code (e.g., "en", "ru")
+        profilePicture:
+          type: string
+          format: uri
+          description: URL to the user's profile picture
+        username:
+          type: string
+          description: Telegram username or any user handle
+        allowsWriteToPM:
+          type: boolean
+          description: If user allows direct messages
+      required:
+        - id
+        - firstName
+
+    User:
+      type: object
+      description: User data structure
+      properties:
+        id:
+          type: string
+          description: Unique identifier of the user
+        firstName:
+          type: string
+        lastName:
+          type: string
+        languageCode:
+          type: string
+        profilePicture:
+          type: string
+          format: uri
+        username:
+          type: string
+        allowsWriteToPM:
+          type: boolean
+        creationDate:
+          type: string
+          format: date-time
+      required:
+        - id
+        - firstName
+        - creationDate
+
+    # --------------------------
+    # Survey
+    # --------------------------
+    SurveyListItem:
+      type: object
+      description: A subset of survey fields used in listing
+      properties:
+        id:
+          type: string
+          description: Unique identifier of the survey
+        title:
+          type: string
+        description:
+          type: string
+        progress:
+          type: integer
+          description: Progress percentage (0–100)
+      required:
+        - id
+        - title
+        - description
+        - progress
+
+    SurveyDetail:
+      type: object
+      description: Full details of a survey, including questions and user's answers
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        description:
+          type: string
+        creationDate:
+          type: string
+          format: date-time
+        isActive:
+          type: boolean
+        codeValidEndDate:
+          type: string
+          format: date-time
+        questions:
+          type: array
+          items:
+            $ref: '#/components/schemas/QuestionDetail'
+      required:
+        - id
+        - title
+        - questions
+
+    QuestionDetail:
+      type: object
+      description: A question within a survey
+      properties:
+        id:
+          type: string
+        surveyId:
+          type: string
+        title:
+          type: string
+        description:
+          type: string
+        index:
+          type: integer
+          description: Position of the question in the survey
+        answerVariants:
+          type: array
+          items:
+            $ref: '#/components/schemas/AnswerVariant'
+        userAnswerVariantId:
+          type: string
+          nullable: true
+          description: The ID of the answer variant the user selected (null if not answered)
+      required:
+        - id
+        - title
+        - answerVariants
+
+    AnswerVariant:
+      type: object
+      description: Possible answer variant to a question
+      properties:
+        id:
+          type: string
+          description: Unique ID of the answer variant
+        questionId:
+          type: string
+        label:
+          type: string
+        value:
+          type: string
+          description: Any additional data or value needed
+      required:
+        - id
+        - label
+        - value
+
+    # --------------------------
+    # Answers
+    # --------------------------
+    AnswerRequest:
+      type: object
+      description: Payload for user to submit an answer
+      properties:
+        questionId:
+          type: string
+        answerVariantId:
+          type: string
+      required:
+        - questionId
+        - answerVariantId
+
+    Answer:
+      type: object
+      description: Representing a saved answer
+      properties:
+        id:
+          type: string
+          description: Unique ID of the answer record
+        userId:
+          type: string
+        questionId:
+          type: string
+        answerId:
+          type: string
+          description: The chosen answer variant ID
+        timestamp:
+          type: string
+          format: date-time
+      required:
+        - id
+        - userId
+        - questionId
+        - answerId
+        - timestamp
+
+    # --------------------------
+    # Codes
+    # --------------------------
+    Code:
+      type: object
+      description: Promo code details
+      properties:
+        id:
+          type: string
+          description: Unique identifier for the code record
+        userId:
+          type: string
+        surveyId:
+          type: string
+        promoCode:
+          type: string
+          description: Actual code string
+        isUsed:
+          type: boolean
+      required:
+        - id
+        - userId
+        - surveyId
+        - promoCode
+        - isUsed
+
+    CodeActivateRequest:
+      type: object
+      description: Request to activate a promo-code
+      properties:
+        promoCode:
+          type: string
+      required:
+        - promoCode
+
+    CodeActivateResponse:
+      type: object
+      description: Response after attempting to activate a code
+      properties:
+        success:
+          type: boolean
+          description: Whether the code activation was successful
+        message:
+          type: string
+          description: Additional information
+      required:
+        - success
+        - message
+
+    # --------------------------
+    # Error Response
+    # --------------------------
+    ErrorResponse:
+      type: object
+      description: A standard error response
+      properties:
+        errorCode:
+          type: string
+          description: Machine-readable error code
+        message:
+          type: string
+          description: Human-readable error message
+      required:
+        - errorCode
+        - message
