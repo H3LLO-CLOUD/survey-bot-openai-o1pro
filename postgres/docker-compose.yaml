@@ -1,0 +1,12 @@
+version: "3.9"
+services:
+  postgres:
+    image: postgres:17.2
+    environment:
+      POSTGRES_DB: "survey_bot_db"
+      POSTGRES_USER: "survey_bot_user"
+      POSTGRES_PASSWORD: "L2eVC5aTUB1tzni3tYW0gZ06sGCrsqP5/45dUUE+JWw="
+    volumes:
+      - .:/docker-entrypoint-initdb.d
+    ports:
+      - "5432:5432"
