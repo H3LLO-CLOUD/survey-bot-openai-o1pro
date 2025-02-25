@@ -1,0 +1,24 @@
+version: "3.9"
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: production
+    environment:
+      POSTGRES_URL: "jdbc:postgresql://postgres:5432/survey_bot_db"
+      POSTGRES_USER: "survey_bot_user"
+      POSTGRES_PASSWORD: "L2eVC5aTUB1tzni3tYW0gZ06sGCrsqPjn45kjj3d3w3"
+    ports:
+      - "8080:8080"
+
+  postgres:
+    image: postgres:17.2
+    environment:
+      POSTGRES_DB: "survey_bot_db"
+      POSTGRES_USER: "survey_bot_user"
+      POSTGRES_PASSWORD: "L2eVC5aTUB1tzni3tYW0gZ06sGCrsqPjn45kjj3d3w3"
+    volumes:
+      - .:/docker-entrypoint-initdb.d
+    ports:
+      - "5432:5432"

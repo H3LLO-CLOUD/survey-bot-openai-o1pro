@@ -1,0 +1,482 @@
+openapi: 3.0.3
+info:
+  title: Survey Service API
+  description: Provides backend services for the Survey Telegram Mini App.
+  version: 1.0.0
+servers:
+  - url: https://r7g3f8ge123.l1vestack.tech
+  - url: https://survey-bot.h3llo.cloud
+  - url: http://192.168.0.5:8080
+  - url: http://127.0.0.1:8080
+paths:
+  /user:
+    post:
+      summary: Create new user
+      operationId: createUser
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                id:
+                  type: number
+                firstName:
+                  type: string
+                lastName:
+                  type: string
+                languageCode:
+                  type: string
+                profilePicture:
+                  type: string
+                username:
+                  type: string
+                allowsWriteToPM:
+                  type: boolean
+              required: [id, firstName, languageCode]
+            examples:
+              user:
+                value:
+                  id: 1234567890
+                  firstName: "John"
+                  lastName: "Doe"
+                  languageCode: "en-US"
+                  profilePicture: "https://example.com/picture.jpg"
+                  username: "johndoe"
+                  allowsWriteToPM: true
+      responses:
+        '201':
+          description: User created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+              examples:
+                user:
+                  value:
+                    id: "1234567890"
+                    firstName: "John"
+                    lastName: "Doe"
+                    languageCode: "en-US"
+                    profilePicture: "https://example.com/picture.jpg"
+                    username: "johndoe"
+                    allowsWriteToPM: true
+                    creationDate: "2022-01-01T12:00:00Z"
+        '409':
+          description: User with the same ID already exists
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  errorCode:
+                    type: string
+                  message:
+                    type: string
+              examples:
+                error:
+                  value:
+                    errorCode: "USER_ALREADY_EXISTS"
+                    message: "User with ID 1234567890 already exists"
+
+  /survey:
+    get:
+      summary: List Active Surveys available for user
+      operationId: listSurveys
+      parameters:
+        - in: header
+          name: userId
+          schema:
+            type: string
+          required: true
+          example: "1234567890"
+      responses:
+        '200':
+          description: List of surveys
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: string
+                    title:
+                      type: string
+                    description:
+                      type: string
+                    progress:
+                      type: integer
+              examples:
+                surveys:
+                  value:
+                    - id: "survey1"
+                      title: "Survey 1"
+                      description: "This is survey 1"
+                      progress: 0
+                    - id: "survey2"
+                      title: "Survey 2"
+                      description: "This is survey 2"
+                      progress: 50
+
+  /survey/{surveyId}:
+    get:
+      summary: View survey details
+      operationId: getSurveyDetails
+      parameters:
+        - in: header
+          name: userId
+          schema:
+            type: string
+          required: true
+          example: "1234567890"
+        - name: surveyId
+          in: path
+          required: true
+          schema:
+            type: string
+            example: "survey1"
+      responses:
+        '200':
+          description: Survey details including questions and answers
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                  title:
+                    type: string
+                  description:
+                    type: string
+                  questions:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                        title:
+                          type: string
+                        description:
+                          type: string
+                        index:
+                          type: integer
+                        answerVariants:
+                          type: array
+                          items:
+                            type: object
+                            properties:
+                              id:
+                                type: string
+                              label:
+                                type: string
+                              value:
+                                type: string
+                        userAnswer:
+                          type: string
+              examples:
+                survey:
+                  value:
+                    id: "survey1"
+                    title: "Survey 1"
+                    description: "This is survey 1"
+                    questions:
+                      - id: "question1"
+                        title: "Question 1"
+                        description: "This is question 1"
+                        index: 0
+                        answerVariants:
+                          - id: "answer1"
+                            label: "Answer 1"
+                            value: "value1"
+                          - id: "answer2"
+                            label: "Answer 2"
+                            value: "value2"
+                        userAnswer: null
+        '404':
+          description: Survey not found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  errorCode:
+                    type: string
+                  message:
+                    type: string
+              examples:
+                error:
+                  value:
+                    errorCode: "SURVEY_NOT_FOUND"
+                    message: "Survey with ID survey1 not found"
+
+  /survey/{surveyId}/answer:
+    post:
+      summary: Submit an answer for a survey question
+      operationId: submitAnswer
+      parameters:
+        - in: header
+          name: userId
+          schema:
+            type: string
+          required: true
+          example: "1234567890"
+        - name: surveyId
+          in: path
+          required: true
+          schema:
+            type: string
+          examples:
+            surveyId:
+              value: "survey1"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                questionId:
+                  type: string
+                answerVariantId:
+                  type: string
+              required: [questionId, answerVariantId]
+            examples:
+              answer:
+                value:
+                  questionId: "question1"
+                  answerVariantId: "answer1"
+      responses:
+        '200':
+          description: Answer submitted successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+              examples:
+                success:
+                  value:
+                    success: true
+        '404':
+          description: Survey not found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  errorCode:
+                    type: string
+                  message:
+                    type: string
+              examples:
+                error:
+                  value:
+                    errorCode: "SURVEY_NOT_FOUND"
+                    message: "Survey with ID survey1 not found"
+        '400':
+          description: Invalid request due to missing or incorrect data
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  errorCode:
+                    type: string
+                  message:
+                    type: string
+              examples:
+                error:
+                  value:
+                    errorCode: "INVALID_REQUEST"
+                    message: "Question ID and answer variant ID are required"
+
+  /code/{surveyId}:
+    get:
+      summary: View promo code for completed survey
+      operationId: viewPromoCode
+      parameters:
+        - in: header
+          name: userId
+          schema:
+            type: string
+          required: true
+          example: "1234567890"
+        - name: surveyId
+          in: path
+          required: true
+          schema:
+            type: string
+            example: "survey1"
+      responses:
+        '200':
+          description: Promo code
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: string
+              examples:
+                promoCode:
+                  value:
+                    code: "PROMO123"
+        '404':
+          description: Promo Code not found for this survey
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  errorCode:
+                    type: string
+                  message:
+                    type: string
+              examples:
+                error:
+                  value:
+                    errorCode: "CODE_NOT_FOUND"
+                    message: "Code for survey with ID survey1 not found"
+
+  /code/activate:
+    post:
+      summary: Activate promo code
+      operationId: activatePromoCode
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                codeId:
+                  type: string
+              required: [codeId]
+            examples:
+              codeActivation:
+                value:
+                  codeId: "PROMO123"
+      responses:
+        '200':
+          description: Promo code activated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+              examples:
+                success:
+                  value:
+                    success: true
+        '400':
+          description: Invalid or already used promo code
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  errorCode:
+                    type: string
+                  message:
+                    type: string
+              examples:
+                error:
+                  value:
+                    errorCode: "INVALID_PROMO_CODE"
+                    message: "Promo code is invalid or already used"
+
+components:
+  schemas:
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+        firstName:
+          type: string
+        lastName:
+          type: string
+        languageCode:
+          type: string
+        profilePicture:
+          type: string
+        username:
+          type: string
+        allowsWriteToPM:
+          type: boolean
+        creationDate:
+          type: string
+          format: date-time
+    Survey:
+      type: object
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        description:
+          type: string
+        creationDate:
+          type: string
+          format: date-time
+        isActive:
+          type: boolean
+        codeValidEndDate:
+          type: string
+          format: date-time
+    Question:
+      type: object
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        description:
+          type: string
+        index:
+          type: integer
+    AnswerVariant:
+      type: object
+      properties:
+        id:
+          type: string
+        questionId:
+          type: string
+        label:
+          type: string
+        value:
+          type: string
+    Answer:
+      type: object
+      properties:
+        id:
+          type: string
+        userId:
+          type: string
+        questionId:
+          type: string
+        answerId:
+          type: string
+        timestamp:
+          type: string
+          format: date-time
+    Code:
+      type: object
+      properties:
+        id:
+          type: string
+        userId:
+          type: string
+        surveyId:
+          type: string
+        isUsed:
+          type: boolean
